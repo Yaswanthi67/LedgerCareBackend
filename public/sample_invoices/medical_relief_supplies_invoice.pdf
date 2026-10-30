@@ -1,0 +1,65 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 580 >>
+stream
+BT
+/F1 16 Tf
+50 720 Td
+(TAX INVOICE / EXPENDITURE VOUCHER - LEDGERCARE) Tj
+/F1 10 Tf
+0 -25 Td
+(Vendor: Apollo Healthcare & Relief Supplies Pvt Ltd | GSTIN: 27AAACA9812K1Z9) Tj
+0 -18 Td
+(Invoice Number: INV-MED-2026-00481 | Billing Date: 30-Oct-2026) Tj
+0 -25 Td
+(Billed To: Asha Deep Welfare Foundation | 80G No: 80G-DEL-2024-98421) Tj
+0 -18 Td
+(Associated Campaign: Emergency Medical Kits & Flood Relief) Tj
+0 -30 Td
+(=================================================================================) Tj
+0 -20 Td
+(Item Description                                    Qty       Unit Price      Total) Tj
+0 -20 Td
+(=================================================================================) Tj
+0 -20 Td
+(1. Emergency First-Aid Response Trauma Kits         50 Kits   Rs 500.00       Rs 25,000.00) Tj
+0 -18 Td
+(2. Essential Water Purification Tablets (Box of 100) 40 Boxes Rs 250.00       Rs 10,000.00) Tj
+0 -18 Td
+(3. Antiseptic Liquid & Sterile Gauze Dressings      20 Packs  Rs 500.00       Rs 10,000.00) Tj
+0 -25 Td
+(=================================================================================) Tj
+0 -20 Td
+(TOTAL EXPENDITURE INVOICE AMOUNT:                                     Rs 45,000.00) Tj
+0 -20 Td
+(PAYMENT STATUS: COMPLETED VIA BANK UPI TRANSFER - REF: 84920199482) Tj
+0 -25 Td
+(Cryptographic Proof: SHA-256 Registered on LedgerCare FundEvidenceTracker.sol) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000224 00000 n 
+0000000858 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+927
+%%EOF
