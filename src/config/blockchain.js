@@ -61,6 +61,10 @@ export const DONATION_LEDGER_ABI = [
 ];
 
 export const FUND_EVIDENCE_TRACKER_ABI = [
+  'function registerEvidence(uint256 campaignId, string memory ipfsCid, bytes32 sha256Hash) external returns (uint256)',
+  'function getEvidenceRecord(uint256 evidenceId) external view returns (tuple(uint256 evidenceId, uint256 campaignId, address charityWallet, string ipfsCid, bytes32 sha256Hash, uint256 timestamp))',
+  'function getCampaignEvidenceList(uint256 campaignId) external view returns (uint256[] memory)',
+  'event EvidenceRegistered(uint256 indexed evidenceId, uint256 indexed campaignId, address indexed charityWallet, string ipfsCid, bytes32 sha256Hash, uint256 timestamp)',
   'function recordFundUsage(uint256 campaignId, uint256 amount, string memory purpose, bytes32 evidenceHash) external',
   'function getFundUsage(uint256 usageId) external view returns (tuple(uint256 usageId, uint256 campaignId, address charityWallet, uint256 amount, string purpose, bytes32 evidenceHash, uint256 timestamp))',
   'function getCampaignFundUsages(uint256 campaignId) external view returns (uint256[] memory)',

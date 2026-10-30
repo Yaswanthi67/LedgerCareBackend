@@ -9,7 +9,7 @@ export class CharityController {
   static async getAllCharities(req, res, next) {
     try {
       const onChainCharities = await BlockchainService.getAllCharities();
-      const dbCharities = db.getAllCharities();
+      const dbCharities = await db.getAllCharities();
 
       // Merge by charityId or registrationNumber
       const merged = [...onChainCharities];
@@ -35,8 +35,42 @@ export class CharityController {
   }
 
   /**
+   * GET /api/charities/:id
+   */
+  static async getCharityById(req, res, next) {
+    try {
+      const { id } = req.params;
+      const charity = await db.getCharityById(id);
+
+      if (charity) {
+        return res.status(200).json({
+          success: true,
+          charity,
+        });
+      }
+
+      const all = await BlockchainService.getAllCharities();
+      const match = all.find((c) => Number(c.charityId) === Number(id));
+
+      if (!match) {
+        return res.status(404).json({
+          success: false,
+          message: `Charity #${id} not found.`,
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        charity: match,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * POST /api/charities/register
-   * Registers a new charity organization
+   * Registers a new charity organization on blockchain and in MongoDB
    */
   static async registerCharity(req, res, next) {
     try {
@@ -57,8 +91,13 @@ export class CharityController {
         walletAddress,
       });
 
-      // Persist in local database
-      db.saveCharity(charityRecord);
+      if (req.body.transactionHash) {
+        charityRecord.transactionHash = req.body.transactionHash;
+        charityRecord.blockchainTransactionHash = req.body.transactionHash;
+      }
+
+      // Persist in MongoDB / database
+      await db.saveCharity(charityRecord);
 
       res.status(201).json({
         success: true,
@@ -82,7 +121,8 @@ export class CharityController {
     try {
       const { id } = req.params;
       const all = await BlockchainService.getAllCharities();
-      const match = all.find((c) => Number(c.charityId) === Number(id)) || db.getAllCharities().find((c) => Number(c.charityId) === Number(id));
+      const dbCharity = await db.getCharityById(id);
+      const match = all.find((c) => Number(c.charityId) === Number(id)) || dbCharity;
 
       if (match) {
         return res.status(200).json({
@@ -91,7 +131,7 @@ export class CharityController {
           verificationStatus: match.verified ? 'VERIFIED' : 'PENDING_VERIFICATION',
           campaignEligibility: match.verified ? 'ALLOWED' : 'BLOCKED',
           blockchainStatus: 'RECORDED',
-          hash: match.credHash || '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
+          hash: match.credHash || match.registrationDocumentHash || '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
         });
       }
 

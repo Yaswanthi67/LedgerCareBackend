@@ -12,7 +12,7 @@ export class PaymentService {
   /**
    * Creates a Razorpay order in INR
    */
-  static async createOrder({ campaignId, amountInr, donorName, donorEmail, donorPhone }) {
+  static async createOrder({ campaignId, amountInr, donorName, donorEmail, donorPhone, donorWalletAddress }) {
     const amountInPaise = Math.round(amountInr * 100);
     const ethAmount = convertInrToEth(amountInr);
     const receiptId = `rcpt_${Date.now()}_${campaignId}`;
@@ -29,12 +29,12 @@ export class PaymentService {
           donorName,
           donorEmail: donorEmail || '',
           donorPhone: donorPhone || '',
+          donorWalletAddress: donorWalletAddress || '',
           ethAmount: ethAmount.toString(),
         },
       });
     } catch (err) {
       console.log(`[Payment] Using demo/test payment order for ₹${amountInr} (Campaign #${campaignId})`);
-      // Generate deterministic test order for sandbox/demo environment
       const mockOrderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       razorpayOrder = {
         id: mockOrderId,
@@ -48,13 +48,14 @@ export class PaymentService {
           donorName,
           donorEmail: donorEmail || '',
           donorPhone: donorPhone || '',
+          donorWalletAddress: donorWalletAddress || '',
           ethAmount: ethAmount.toString(),
         },
       };
     }
 
-    // Persist pending order in database
-    const record = db.createOrder({
+    // Persist pending order in MongoDB / local database
+    const record = await db.createOrder({
       orderId: razorpayOrder.id,
       campaignId,
       amountInr,
@@ -62,6 +63,7 @@ export class PaymentService {
       donorName,
       donorEmail,
       donorPhone,
+      donorWalletAddress,
     });
 
     return {
@@ -114,7 +116,6 @@ export class PaymentService {
     // 2. Server-side Cryptographic Signature Verification
     let isSignatureValid = false;
 
-    // Check if real HMAC matches
     const expectedSignature = crypto
       .createHmac('sha256', PAYMENT_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -128,17 +129,16 @@ export class PaymentService {
       razorpay_payment_id.startsWith('pay_test_') ||
       razorpay_signature === 'sandbox_verified_signature'
     ) {
-      // In demo test mode, verify format
       isSignatureValid = Boolean(razorpay_payment_id && razorpay_order_id);
     }
 
     if (!isSignatureValid) {
-      db.updatePaymentStatus(razorpay_order_id, 'FAILED', razorpay_payment_id, razorpay_signature);
+      await db.updatePaymentStatus(razorpay_order_id, 'FAILED', razorpay_payment_id, razorpay_signature);
       throw new Error('Payment signature verification failed: invalid signature.');
     }
 
     // 3. Mark payment as PAID in database
-    const updatedRecord = db.updatePaymentStatus(
+    const updatedRecord = await db.updatePaymentStatus(
       razorpay_order_id,
       'PAID',
       razorpay_payment_id,

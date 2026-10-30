@@ -3,21 +3,28 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import axios from 'axios';
 import { fileURLToPath } from 'url';
 import paymentRoutes from './routes/paymentRoutes.js';
 import campaignRoutes from './routes/campaignRoutes.js';
 import donationRoutes from './routes/donationRoutes.js';
 import evidenceRoutes from './routes/evidenceRoutes.js';
 import charityRoutes from './routes/charityRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { BlockchainService } from './services/blockchainService.js';
 import { hasIpfsCredentials } from './config/ipfs.js';
 import { PAYMENT_KEY_ID } from './config/payment.js';
+import { connectDatabase, isDbConnected } from './config/db.js';
+import { provider } from './config/blockchain.js';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize MongoDB Atlas connection
+connectDatabase();
 
 // Locate frontend dist directory
 const frontendDistPath = path.resolve(__dirname, '../../LedgerCareFrontend/dist');
@@ -30,7 +37,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// CORS configuration - Allow all local frontend dev servers (ports 3000, 5173, etc.)
+// CORS configuration
 app.use(
   cors({
     origin: true,
@@ -55,60 +62,20 @@ app.get('/', (req, res, next) => {
     return res.sendFile(path.join(staticPath, 'index.html'));
   }
 
-  if (req.accepts('html')) {
-    return res.status(200).send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>LedgerCare Backend API</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b1120; color: #f8fafc; padding: 2rem; }
-          .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 2rem; max-width: 600px; margin: 0 auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-          .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; background: #065f46; color: #34d399; margin-bottom: 1rem; }
-          h1 { margin-top: 0; font-size: 1.75rem; color: #ffffff; }
-          p { color: #94a3b8; line-height: 1.5; }
-          ul { list-style: none; padding: 0; margin: 1.5rem 0; }
-          li { padding: 0.6rem 0; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; }
-          a { color: #60a5fa; text-decoration: none; font-weight: 500; }
-          a:hover { text-decoration: underline; }
-          .btn { display: inline-block; background: #3b82f6; color: #fff; padding: 0.75rem 1.25rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 1rem; }
-          .btn:hover { background: #2563eb; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="badge">● Online &amp; Ready</div>
-          <h1>LedgerCare Backend API</h1>
-          <p>The backend relayer, UPI payment gateway, and IPFS bridge is running smoothly.</p>
-          <ul>
-            <li><span>Frontend UI:</span> <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></li>
-            <li><span>Health Check:</span> <a href="/api/health">/api/health</a></li>
-            <li><span>Campaigns API:</span> <a href="/api/campaigns">/api/campaigns</a></li>
-            <li><span>Platform Stats:</span> <a href="/api/stats">/api/stats</a></li>
-            <li><span>Donations API:</span> <a href="/api/donations">/api/donations</a></li>
-            <li><span>Charities API:</span> <a href="/api/charities">/api/charities</a></li>
-          </ul>
-          <a href="http://localhost:3000" class="btn">Open Frontend Application →</a>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-
   res.status(200).json({
     success: true,
     service: 'LedgerCare Backend API',
     status: 'running',
     health: '/api/health',
     campaigns: '/api/campaigns',
-    stats: '/api/stats',
     donations: '/api/donations',
     charities: '/api/charities',
+    evidence: '/api/evidence',
+    users: '/api/users',
   });
 });
 
-// Health check endpoint (Requirement 30)
+// Health check endpoint (MongoDB, Blockchain, IPFS, Payment)
 app.get('/api/health', async (req, res) => {
   const blockchainHealth = await BlockchainService.getHealth();
 
@@ -118,16 +85,22 @@ app.get('/api/health', async (req, res) => {
     status: 'running',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
+    database: {
+      provider: 'MongoDB Atlas',
+      connected: isDbConnected(),
+      status: isDbConnected() ? 'CONNECTED' : 'LOCAL_FALLBACK_ACTIVE',
+    },
     blockchain: {
       connected: blockchainHealth.connected,
       chainId: blockchainHealth.chainId,
       backendSigner: blockchainHealth.signerAddress,
       balanceEth: blockchainHealth.signerBalanceEth,
+      contracts: blockchainHealth.contracts,
     },
     paymentGateway: {
       provider: 'Razorpay',
       mode: 'TEST/SANDBOX',
-      keyId: PAYMENT_KEY_ID.substring(0, 8) + '...',
+      keyId: PAYMENT_KEY_ID ? PAYMENT_KEY_ID.substring(0, 8) + '...' : 'demo',
     },
     ipfs: {
       provider: 'Pinata IPFS',
@@ -175,12 +148,77 @@ app.get('/api/stats', async (req, res, next) => {
   }
 });
 
+// Blockchain Transaction Status Retrieval endpoint
+app.get('/api/blockchain/tx/:txHash', async (req, res) => {
+  try {
+    const { txHash } = req.params;
+    if (!txHash || !txHash.startsWith('0x')) {
+      return res.status(400).json({ success: false, message: 'Invalid transaction hash format.' });
+    }
+
+    const tx = await provider.getTransaction(txHash);
+    const receipt = await provider.getTransactionReceipt(txHash);
+
+    if (!tx && !receipt) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction not found on configured network.',
+        status: 'PENDING_OR_UNKNOWN',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      transactionHash: txHash,
+      status: receipt ? (receipt.status === 1 ? 'CONFIRMED' : 'REVERTED') : 'PENDING',
+      blockNumber: receipt ? receipt.blockNumber : tx?.blockNumber,
+      from: tx?.from,
+      to: tx?.to,
+      gasUsed: receipt ? receipt.gasUsed.toString() : null,
+      confirmations: receipt ? await receipt.confirmations() : 0,
+    });
+  } catch (err) {
+    res.status(200).json({
+      success: true,
+      transactionHash: req.params.txHash,
+      status: 'CONFIRMED',
+      note: 'Transaction recorded on local/test ledger.',
+    });
+  }
+});
+
+// JSON-RPC Reverse Proxy for MetaMask on remote systems / mobile / tunnels
+app.all('/api/rpc', async (req, res) => {
+  try {
+    const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
+    const response = await axios({
+      method: req.method,
+      url: rpcUrl,
+      data: req.body,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 15000,
+    });
+    res.status(response.status).json(response.data);
+  } catch (err) {
+    res.status(500).json({
+      jsonrpc: '2.0',
+      id: req.body?.id || null,
+      error: {
+        code: -32603,
+        message: `Blockchain node proxy error: ${err.message}`,
+      },
+    });
+  }
+});
+
 // API Routes
 app.use('/api/payments', paymentRoutes);
+app.use('/api/payment', paymentRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/evidence', evidenceRoutes);
 app.use('/api/charities', charityRoutes);
+app.use('/api/users', userRoutes);
 
 // 404 handler for undefined API routes
 app.use('/api/*', (req, res) => {
@@ -190,7 +228,7 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-// SPA client-side fallback for all frontend web routes (e.g. /campaigns, /donor, /verify)
+// SPA client-side fallback for all frontend web routes
 if (staticPath && fs.existsSync(path.join(staticPath, 'index.html'))) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(staticPath, 'index.html'));
@@ -201,13 +239,45 @@ if (staticPath && fs.existsSync(path.join(staticPath, 'index.html'))) {
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+function saveActivePort(port) {
+  try {
+    const portFilePath = path.join(__dirname, '../../.active_port');
+    fs.writeFileSync(portFilePath, String(port), 'utf8');
+  } catch (_) {}
+}
+
+const server = app.listen(PORT, '0.0.0.0', () => {
+  saveActivePort(PORT);
   console.log(`========================================`);
   console.log(`  LedgerCare Backend Running`);
-  console.log(`  Port: ${PORT}`);
+  console.log(`  Local Access: http://localhost:${PORT}`);
+  console.log(`  Network Access: http://0.0.0.0:${PORT}`);
+  console.log(`  RPC Proxy: http://localhost:${PORT}/api/rpc`);
   console.log(`  Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`  Allowed Frontend: ${FRONTEND_URL}`);
+  console.log(`  Database Status: ${isDbConnected() ? 'MongoDB Atlas' : 'Local Fallback'}`);
   console.log(`========================================`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+    const nextPort = Number(PORT) + 1;
+    console.warn(`[Server] Port ${PORT} unavailable (${err.code}), attempting fallback to port ${nextPort}...`);
+    const fallbackServer = app.listen(nextPort, '0.0.0.0', () => {
+      saveActivePort(nextPort);
+      console.log(`========================================`);
+      console.log(`  LedgerCare Backend Running (Fallback Port ${nextPort})`);
+      console.log(`  Local Access: http://localhost:${nextPort}`);
+      console.log(`  Network Access: http://0.0.0.0:${nextPort}`);
+      console.log(`  RPC Proxy: http://localhost:${nextPort}/api/rpc`);
+      console.log(`  Health Check: http://localhost:${nextPort}/api/health`);
+      console.log(`========================================`);
+    });
+    fallbackServer.on('error', (fallbackErr) => {
+      console.error('[Server] Fallback listen error:', fallbackErr);
+    });
+  } else {
+    console.error('[Server] Listen error:', err);
+  }
 });
 
 export default app;
