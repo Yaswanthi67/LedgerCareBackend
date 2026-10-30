@@ -300,7 +300,97 @@ class DatabaseService {
   }
 
   getRecordById(id) {
-    return this.records.find((r) => r.id === id || r.orderId === id || r.paymentId === id) || null;
+    return this.records.find((r) => r.id === id || r.orderId === id || r.paymentId === id || r.donationId === id || (r.transactionHash && r.transactionHash.toLowerCase() === id.toLowerCase())) || null;
+  }
+
+  async saveVerifiedDonation(donationData) {
+    const donationId = donationData.donationId || `don_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const txHash = (donationData.transactionHash || donationData.blockchainTransactionHash || '').toLowerCase();
+
+    // Deduplication: check if donation with this transactionHash or donationReference already exists
+    let existing = this.records.find((r) =>
+      (txHash && (r.transactionHash?.toLowerCase() === txHash || r.blockchainTransactionHash?.toLowerCase() === txHash)) ||
+      (donationData.donationReference && r.donationReference === donationData.donationReference)
+    );
+
+    const amountInr = Number(donationData.amountInr || 0);
+    const amountInPaise = Number(donationData.amountInPaise || amountInr * 100);
+
+    const record = {
+      id: existing ? existing.id : `ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      orderId: existing ? existing.orderId : donationId,
+      donationId,
+      campaignId: Number(donationData.campaignId),
+      donorName: donationData.donorName ? donationData.donorName.trim() : (existing?.donorName || 'Verified Donor'),
+      donorEmail: donationData.donorEmail ? donationData.donorEmail.trim() : (existing?.donorEmail || null),
+      donorPhone: donationData.donorPhone ? donationData.donorPhone.trim() : (existing?.donorPhone || null),
+      donorWalletAddress: (donationData.donorWalletAddress || donationData.donorAddress || '').toLowerCase(),
+      amountInr,
+      donationAmountInr: amountInr,
+      amountInPaise,
+      amountEth: 0,
+      paymentMethod: 'AVALANCHE_FUJI_BLOCKCHAIN',
+      paymentStatus: 'PAID',
+      blockchainStatus: 'CONFIRMED',
+      transactionHash: txHash,
+      blockchainTransactionHash: txHash,
+      blockchainDonationId: Number(donationData.blockchainDonationId || 1),
+      blockNumber: Number(donationData.blockNumber || 0),
+      donationReference: donationData.donationReference || null,
+      smartContractAddress: (donationData.smartContractAddress || '').toLowerCase(),
+      networkChainId: 43113,
+      blockchainTimestamp: donationData.blockchainTimestamp || new Date(),
+      createdAt: existing ? existing.createdAt : Date.now(),
+      donationDate: donationData.blockchainTimestamp || new Date(),
+      updatedAt: Date.now(),
+    };
+
+    if (existing) {
+      const idx = this.records.findIndex((r) => r.id === existing.id);
+      this.records[idx] = { ...this.records[idx], ...record };
+    } else {
+      this.records.unshift(record);
+    }
+    this.save();
+
+    if (isDbConnected()) {
+      try {
+        await Donation.findOneAndUpdate(
+          { $or: [{ donationId }, { blockchainTransactionHash: txHash }] },
+          {
+            donationId,
+            donorWalletAddress: record.donorWalletAddress,
+            campaignId: record.campaignId,
+            donorName: record.donorName,
+            donorEmail: record.donorEmail,
+            amountInr: record.amountInr,
+            amountInPaise: record.amountInPaise,
+            paymentStatus: 'PAID',
+            blockchainStatus: 'CONFIRMED',
+            blockchainTransactionHash: txHash,
+            blockchainDonationId: record.blockchainDonationId,
+            blockNumber: record.blockNumber,
+            donationReference: record.donationReference,
+            smartContractAddress: record.smartContractAddress,
+            networkChainId: 43113,
+            donationDate: record.donationDate,
+          },
+          { upsert: true, new: true }
+        );
+      } catch (err) {
+        console.warn('MongoDB saveVerifiedDonation note:', err.message);
+      }
+    }
+
+    return record;
+  }
+
+  async getDonationsByDonor(walletAddress) {
+    return this.getAllDonations({ donorWalletAddress: walletAddress });
+  }
+
+  async getDonationsByCampaign(campaignId) {
+    return this.getAllDonations({ campaignId });
   }
 
   async getAllDonations(filter = {}) {

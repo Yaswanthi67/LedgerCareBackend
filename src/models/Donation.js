@@ -8,7 +8,13 @@ const donationSchema = new mongoose.Schema(
     campaignId: { type: Number, required: true, index: true },
     amountInr: { type: Number, required: true },
     donationAmountInr: { type: Number },
+    amountInPaise: { type: Number, required: true, default: 0 },
     amountEth: { type: Number, default: 0 },
+    donationReference: { type: String, trim: true, index: true, unique: true, sparse: true },
+    smartContractAddress: { type: String, lowercase: true, trim: true, default: null },
+    networkChainId: { type: Number, default: 43113 },
+    blockNumber: { type: Number, default: null },
+    blockchainTimestamp: { type: Date, default: Date.now },
     paymentMethod: { type: String, default: 'UPI' },
     paymentStatus: {
       type: String,
@@ -23,7 +29,7 @@ const donationSchema = new mongoose.Schema(
       default: 'NOT_STARTED',
     },
     blockchainTransactionReference: { type: String, default: null },
-    blockchainTransactionHash: { type: String, default: null },
+    blockchainTransactionHash: { type: String, index: true, default: null },
     blockchainDonationId: { type: Number, default: null },
     donorName: { type: String, default: 'Anonymous Donor', trim: true },
     donorEmail: { type: String, lowercase: true, trim: true },
@@ -33,5 +39,7 @@ const donationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+donationSchema.index({ donorWalletAddress: 1, campaignId: 1, blockchainTransactionHash: 1 });
 
 export const Donation = mongoose.model('Donation', donationSchema);
