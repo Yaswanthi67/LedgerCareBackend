@@ -247,7 +247,7 @@ if (staticPath && fs.existsSync(path.join(staticPath, 'index.html'))) {
 // Centralized error handling middleware
 app.use(errorHandler);
 
-// Start server
+// Start server (only when not running inside serverless environments like Vercel)
 function saveActivePort(port) {
   try {
     const portFilePath = path.join(__dirname, '../../.active_port');
@@ -255,38 +255,40 @@ function saveActivePort(port) {
   } catch (_) {}
 }
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  saveActivePort(PORT);
-  console.log(`========================================`);
-  console.log(`  LedgerCare Backend Running`);
-  console.log(`  Local Access: http://localhost:${PORT}`);
-  console.log(`  Network Access: http://0.0.0.0:${PORT}`);
-  console.log(`  RPC Proxy: http://localhost:${PORT}/api/rpc`);
-  console.log(`  Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`  Database Status: ${isDbConnected() ? 'MongoDB Atlas' : 'Local Fallback'}`);
-  console.log(`========================================`);
-});
+if (!process.env.VERCEL) {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    saveActivePort(PORT);
+    console.log(`========================================`);
+    console.log(`  LedgerCare Backend Running`);
+    console.log(`  Local Access: http://localhost:${PORT}`);
+    console.log(`  Network Access: http://0.0.0.0:${PORT}`);
+    console.log(`  RPC Proxy: http://localhost:${PORT}/api/rpc`);
+    console.log(`  Health Check: http://localhost:${PORT}/api/health`);
+    console.log(`  Database Status: ${isDbConnected() ? 'MongoDB Atlas' : 'Local Fallback'}`);
+    console.log(`========================================`);
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
-    const nextPort = Number(PORT) + 1;
-    console.warn(`[Server] Port ${PORT} unavailable (${err.code}), attempting fallback to port ${nextPort}...`);
-    const fallbackServer = app.listen(nextPort, '0.0.0.0', () => {
-      saveActivePort(nextPort);
-      console.log(`========================================`);
-      console.log(`  LedgerCare Backend Running (Fallback Port ${nextPort})`);
-      console.log(`  Local Access: http://localhost:${nextPort}`);
-      console.log(`  Network Access: http://0.0.0.0:${nextPort}`);
-      console.log(`  RPC Proxy: http://localhost:${nextPort}/api/rpc`);
-      console.log(`  Health Check: http://localhost:${nextPort}/api/health`);
-      console.log(`========================================`);
-    });
-    fallbackServer.on('error', (fallbackErr) => {
-      console.error('[Server] Fallback listen error:', fallbackErr);
-    });
-  } else {
-    console.error('[Server] Listen error:', err);
-  }
-});
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+      const nextPort = Number(PORT) + 1;
+      console.warn(`[Server] Port ${PORT} unavailable (${err.code}), attempting fallback to port ${nextPort}...`);
+      const fallbackServer = app.listen(nextPort, '0.0.0.0', () => {
+        saveActivePort(nextPort);
+        console.log(`========================================`);
+        console.log(`  LedgerCare Backend Running (Fallback Port ${nextPort})`);
+        console.log(`  Local Access: http://localhost:${nextPort}`);
+        console.log(`  Network Access: http://0.0.0.0:${nextPort}`);
+        console.log(`  RPC Proxy: http://localhost:${nextPort}/api/rpc`);
+        console.log(`  Health Check: http://localhost:${nextPort}/api/health`);
+        console.log(`========================================`);
+      });
+      fallbackServer.on('error', (fallbackErr) => {
+        console.error('[Server] Fallback listen error:', fallbackErr);
+      });
+    } else {
+      console.error('[Server] Listen error:', err);
+    }
+  });
+}
 
 export default app;
