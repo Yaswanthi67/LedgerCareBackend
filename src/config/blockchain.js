@@ -1,16 +1,31 @@
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let deployedAddresses = {};
+try {
+  const deployedPath = path.join(__dirname, '../../../LedgerCareBlockchain/deployed-addresses.json');
+  if (fs.existsSync(deployedPath)) {
+    deployedAddresses = JSON.parse(fs.readFileSync(deployedPath, 'utf8'));
+  }
+} catch (_) {}
 
 export const RPC_URL = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
 export const CHAIN_ID = Number(process.env.CHAIN_ID || 31337);
 export const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY;
 
 export const CONTRACT_ADDRESSES = {
-  CharityRegistry: process.env.CHARITY_REGISTRY_ADDRESS || '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-  CampaignManager: process.env.CAMPAIGN_MANAGER_ADDRESS || '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
-  DonationLedger: process.env.DONATION_LEDGER_ADDRESS || '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
-  FundEvidenceTracker: process.env.FUND_EVIDENCE_TRACKER_ADDRESS || '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9',
+  CharityRegistry: process.env.CHARITY_REGISTRY_ADDRESS || deployedAddresses.CharityRegistry || '0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE',
+  CampaignManager: process.env.CAMPAIGN_MANAGER_ADDRESS || deployedAddresses.CampaignManager || '0x68B1D87F95878fE05B998F19b66F4baba5De1aed',
+  DonationLedger: process.env.DONATION_LEDGER_ADDRESS || deployedAddresses.DonationLedger || '0x3Aa5ebB10DC797CAC828524e59A333d0A371443c',
+  FundEvidenceTracker: process.env.FUND_EVIDENCE_TRACKER_ADDRESS || deployedAddresses.FundEvidenceTracker || '0x59b670e9fA9D0A427751Af201D676719a970857b',
 };
 
 export const CHARITY_REGISTRY_ABI = [

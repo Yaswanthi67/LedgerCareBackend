@@ -148,6 +148,15 @@ app.get('/api/stats', async (req, res, next) => {
   }
 });
 
+// Blockchain contract addresses endpoint
+app.get('/api/blockchain/contracts', (req, res) => {
+  res.status(200).json({
+    success: true,
+    chainId: CHAIN_ID,
+    contracts: CONTRACT_ADDRESSES,
+  });
+});
+
 // Blockchain Transaction Status Retrieval endpoint
 app.get('/api/blockchain/tx/:txHash', async (req, res) => {
   try {
