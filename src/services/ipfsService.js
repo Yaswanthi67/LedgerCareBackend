@@ -157,21 +157,30 @@ export class IpfsService {
       fileSizeBytes,
       mimeType,
       ipfsCid,
+      cid,
       originalSha256Hash,
+      sha256Hash,
+      cleanSha256Hash,
+      bytes32Hash,
       uploadedWalletAddress,
+      charityWallet,
       blockchainTransactionHash,
+      transactionHash,
       blockNumber,
       blockchainUsageId,
       purpose,
       amountInr,
     } = confirmData;
 
-    if (!ipfsCid || !originalSha256Hash) {
+    const targetCid = ipfsCid || cid;
+    const targetHash = originalSha256Hash || sha256Hash || cleanSha256Hash || bytes32Hash;
+
+    if (!targetCid || !targetHash) {
       throw new Error('IPFS CID and original SHA-256 hash are required to confirm evidence registration.');
     }
 
-    const cleanHash = originalSha256Hash.replace(/^0x/, '').toLowerCase();
-    const charityWallet = (uploadedWalletAddress || '0x70997970c51812dc3a010c7d01b50e0d17dc79c8').toLowerCase();
+    const cleanHash = targetHash.replace(/^0x/, '').toLowerCase();
+    const targetWallet = (uploadedWalletAddress || charityWallet || '0x70997970c51812dc3a010c7d01b50e0d17dc79c8').toLowerCase();
     const inrNum = Number(amountInr || 0);
 
     const savedRecord = await db.saveEvidence({
@@ -180,12 +189,12 @@ export class IpfsService {
       fileName: fileName || 'evidence_document.pdf',
       fileSizeBytes: Number(fileSizeBytes || 0),
       mimeType: mimeType || 'application/pdf',
-      ipfsCid,
+      ipfsCid: targetCid,
       originalSha256Hash: `0x${cleanHash}`,
       calculatedSha256Hash: `0x${cleanHash}`,
-      uploadedWalletAddress: charityWallet,
-      uploadedByWalletAddress: charityWallet,
-      blockchainTransactionHash: blockchainTransactionHash || null,
+      uploadedWalletAddress: targetWallet,
+      uploadedByWalletAddress: targetWallet,
+      blockchainTransactionHash: blockchainTransactionHash || transactionHash || null,
       blockchainUsageId: Number(blockchainUsageId || 1),
       blockNumber: blockNumber || null,
       purpose: purpose || 'Campaign Expenditure Proof',
