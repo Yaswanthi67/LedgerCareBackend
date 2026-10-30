@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { computeBufferSha256, computeStringSha256, toBytes32Hex } from '../src/utils/hash.js';
 import { db } from '../src/services/dbService.js';
 import { IpfsService } from '../src/services/ipfsService.js';
+import { CONTRACT_ADDRESSES } from '../src/config/blockchain.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -176,14 +177,15 @@ async function runSystemVerification() {
     // Test 5: Smart Contract Configuration & ABIs (Requirement #5)
     // -------------------------------------------------------------
     console.log('TEST 5: Smart Contract Integration & ABIs');
-    const deployedAddressesPath = path.resolve(__dirname, '../../LedgerCareBlockchain/deployed-addresses.json');
-    assert(fs.existsSync(deployedAddressesPath), 'deployed-addresses.json exists in blockchain directory');
+    const localConfigAddresses = path.resolve(__dirname, '../src/config/deployed-addresses.json');
+    const rootBlockchainAddresses = path.resolve(__dirname, '../../LedgerCareBlockchain/deployed-addresses.json');
+    const hasConfig = fs.existsSync(localConfigAddresses) || fs.existsSync(rootBlockchainAddresses) || Boolean(CONTRACT_ADDRESSES.CharityRegistry);
+    assert(hasConfig, 'Smart contract addresses configured in environment or config');
 
-    const deployedAddresses = JSON.parse(fs.readFileSync(deployedAddressesPath, 'utf8'));
-    assert(Boolean(deployedAddresses.CharityRegistry), 'CharityRegistry address configured', deployedAddresses.CharityRegistry);
-    assert(Boolean(deployedAddresses.CampaignManager), 'CampaignManager address configured', deployedAddresses.CampaignManager);
-    assert(Boolean(deployedAddresses.DonationLedger), 'DonationLedger address configured', deployedAddresses.DonationLedger);
-    assert(Boolean(deployedAddresses.FundEvidenceTracker), 'FundEvidenceTracker address configured', deployedAddresses.FundEvidenceTracker);
+    assert(Boolean(CONTRACT_ADDRESSES.CharityRegistry), 'CharityRegistry address configured', CONTRACT_ADDRESSES.CharityRegistry);
+    assert(Boolean(CONTRACT_ADDRESSES.CampaignManager), 'CampaignManager address configured', CONTRACT_ADDRESSES.CampaignManager);
+    assert(Boolean(CONTRACT_ADDRESSES.DonationLedger), 'DonationLedger address configured', CONTRACT_ADDRESSES.DonationLedger);
+    assert(Boolean(CONTRACT_ADDRESSES.FundEvidenceTracker), 'FundEvidenceTracker address configured', CONTRACT_ADDRESSES.FundEvidenceTracker);
     console.log('');
 
     // -------------------------------------------------------------

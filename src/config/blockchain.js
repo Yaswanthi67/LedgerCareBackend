@@ -11,9 +11,12 @@ const __dirname = path.dirname(__filename);
 
 let deployedAddresses = {};
 try {
-  const deployedPath = path.join(__dirname, '../../../LedgerCareBlockchain/deployed-addresses.json');
-  if (fs.existsSync(deployedPath)) {
-    deployedAddresses = JSON.parse(fs.readFileSync(deployedPath, 'utf8'));
+  const localConfigPath = path.join(__dirname, 'deployed-addresses.json');
+  const parentBlockchainPath = path.join(__dirname, '../../../LedgerCareBlockchain/deployed-addresses.json');
+  if (fs.existsSync(localConfigPath)) {
+    deployedAddresses = JSON.parse(fs.readFileSync(localConfigPath, 'utf8'));
+  } else if (fs.existsSync(parentBlockchainPath)) {
+    deployedAddresses = JSON.parse(fs.readFileSync(parentBlockchainPath, 'utf8'));
   }
 } catch (_) {}
 
