@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ledgercare-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: PINATA_JWT
+        sync: false
+      - key: BLOCKCHAIN_RPC_URL
+        value: https://rpc.sepolia.org
+      - key: CHAIN_ID
+        value: 11155111
