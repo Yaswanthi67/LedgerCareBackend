@@ -591,10 +591,21 @@ class DatabaseService {
       uploadTimestamp: evidenceData.uploadTimestamp || new Date(),
     };
 
-    // Save to local JSON
+    // Save to local JSON with strict Immutability Enforcement
     const list = this.getAllEvidenceLocal();
-    const idx = list.findIndex((e) => e.evidenceId === evidenceId || e.ipfsCid === normalized.ipfsCid);
+    const idx = list.findIndex((e) => e.evidenceId === evidenceId || (normalized.ipfsCid && e.ipfsCid === normalized.ipfsCid));
     if (idx >= 0) {
+      const existing = list[idx];
+      // If already anchored to blockchain, reject any attempt to modify or tamper with hash, CID, or amounts
+      if (existing.blockchainTransactionHash) {
+        const isHashChanged = normalized.originalSha256Hash && existing.originalSha256Hash && normalized.originalSha256Hash.toLowerCase() !== existing.originalSha256Hash.toLowerCase();
+        const isCidChanged = normalized.ipfsCid && existing.ipfsCid && normalized.ipfsCid !== existing.ipfsCid;
+        const isAmountChanged = normalized.amountInr && existing.amountInr && Number(normalized.amountInr) !== Number(existing.amountInr);
+
+        if (isHashChanged || isCidChanged || isAmountChanged) {
+          throw new Error('IMMUTABILITY_ERROR: Registered blockchain evidence is permanent and cannot be modified, edited, corrected, or tampered with by charity.');
+        }
+      }
       list[idx] = { ...list[idx], ...normalized };
     } else {
       list.push(normalized);

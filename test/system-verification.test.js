@@ -259,6 +259,31 @@ async function runSystemVerification() {
     console.log('');
 
     // -------------------------------------------------------------
+    // TEST 7: Strict Evidence Immutability Enforcement
+    // -------------------------------------------------------------
+    console.log('TEST 7: Strict Evidence Immutability Enforcement');
+    let immutabilityBlocked = false;
+    try {
+      // Attempt to tamper/overwrite existing confirmed evidence with a different hash
+      await db.saveEvidence({
+        evidenceId: confirmRes.evidenceId,
+        ipfsCid: confirmRes.ipfsCid,
+        originalSha256Hash: '0x9999999999999999999999999999999999999999999999999999999999999999',
+        amountInr: 999999,
+        blockchainTransactionHash: mockTxHash,
+      });
+    } catch (tamperErr) {
+      immutabilityBlocked = tamperErr.message.includes('IMMUTABILITY_ERROR');
+    }
+    assert(immutabilityBlocked, 'Database strictly blocks charity or API from altering/tampering with confirmed evidence');
+
+    // Verify record in database remained completely untouched
+    const freshRecord = await db.getEvidenceById(confirmRes.evidenceId);
+    assert(freshRecord.originalSha256Hash === confirmRes.originalSha256Hash, 'Original SHA-256 hash remained uncorrupted and immutable');
+    assert(freshRecord.amountInr === confirmRes.amountInr, 'Original expenditure amount remained uncorrupted and immutable');
+    console.log('');
+
+    // -------------------------------------------------------------
     // Summary
     // -------------------------------------------------------------
     console.log('================================================================');

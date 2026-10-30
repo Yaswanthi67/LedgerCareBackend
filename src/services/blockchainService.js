@@ -163,6 +163,16 @@ export class BlockchainService {
    * Reads all campaigns
    */
   static async getAllCampaigns() {
+    try {
+      const isLive = await Promise.race([
+        provider.getBlockNumber().then(() => true),
+        new Promise((resolve) => setTimeout(() => resolve(false), 1200)),
+      ]);
+      if (!isLive) return [];
+    } catch {
+      return [];
+    }
+
     const campaignManager = getReadOnlyContract('CampaignManager');
     const charityRegistry = getReadOnlyContract('CharityRegistry');
 
@@ -275,6 +285,16 @@ export class BlockchainService {
    * Reads all charities
    */
   static async getAllCharities() {
+    try {
+      const isLive = await Promise.race([
+        provider.getBlockNumber().then(() => true),
+        new Promise((resolve) => setTimeout(() => resolve(false), 1200)),
+      ]);
+      if (!isLive) return [];
+    } catch {
+      return [];
+    }
+
     const registry = getReadOnlyContract('CharityRegistry');
     const charities = [];
     let charityId = 1;
